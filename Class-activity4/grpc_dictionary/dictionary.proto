@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+service Dictionary {
+  rpc Lookup (WordRequest) returns (WordResponse);
+}
+
+message WordRequest {
+  string word = 1;
+}
+
+message WordResponse {
+  string definition = 1;
+  bool found = 2;
+}
