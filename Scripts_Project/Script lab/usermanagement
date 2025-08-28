@@ -1,0 +1,40 @@
+#!/bin/bash
+
+# Prompt for group name
+read -p "Enter new group name: " groupname
+if getent group "$groupname" > /dev/null; then
+    echo "Error: Group '$groupname' already exists."
+    exit 1
+fi
+
+# Create group
+groupadd "$groupname"
+echo "Group '$groupname' created."
+
+# Prompt for username
+read -p "Enter new username: " username
+if getent passwd "$username" > /dev/null; then
+    echo "Error: User '$username' already exists."
+    exit 1
+fi
+
+# Create user with Bash shell and assign to group
+useradd -m -s /bin/bash -g "$groupname" "$username"
+echo "User '$username' created and added to group '$groupname'."
+
+# Set password
+echo "Set password for '$username':"
+passwd "$username"
+
+# Create directory at root
+userdir="/$username"
+mkdir "$userdir"
+
+# Set ownership
+chown "$username:$groupname" "$userdir"
+
+# Set permissions
+chmod 770 "$userdir"         # Full control for user and group
+chmod +t "$userdir"          # Sticky bit: only owner can delete files
+
+echo "Directory '$userdir' created with proper ownership and permissions."

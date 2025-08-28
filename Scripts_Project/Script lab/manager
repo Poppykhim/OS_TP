@@ -1,0 +1,245 @@
+#!/bin/bash
+
+# Download Manager Script
+# Automatically organizes files by extension into categorized folders
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Function to print colored output
+print_info() {
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+print_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+# Function to create directory if it doesn't exist
+create_directory() {
+    local dir_name=$1
+    if [ ! -d "$dir_name" ]; then
+        mkdir -p "$dir_name"
+        print_success "Created directory: $dir_name"
+    fi
+}
+
+# Function to get category folder name based on file extension
+get_category_folder() {
+    local extension=$1
+    
+    case "$extension" in
+        # Images
+        jpg|jpeg|png|gif|bmp|tiff|svg|webp|ico)
+            echo "Images"
+            ;;
+        # Videos
+        mp4|avi|mkv|mov|wmv|flv|webm|m4v|3gp)
+            echo "Videos"
+            ;;
+        # Audio
+        mp3|wav|flac|aac|ogg|wma|m4a)
+            echo "Audio"
+            ;;
+        # Documents
+        pdf|doc|docx|txt|rtf|odt)
+            echo "Documents"
+            ;;
+        # Spreadsheets
+        xls|xlsx|csv|ods)
+            echo "Spreadsheets"
+            ;;
+        # Presentations
+        ppt|pptx|odp)
+            echo "Presentations"
+            ;;
+        # Archives
+        zip|rar|7z|tar|gz|bz2|xz)
+            echo "Archives"
+            ;;
+        # Executables
+        exe|msi|deb|rpm|dmg|pkg)
+            echo "Executables"
+            ;;
+        # Code files
+        py|js|html|css|php|java|cpp|c|h|sh|pl|rb)
+            echo "Code"
+            ;;
+        # Others
+        *)
+            echo "Others"
+            ;;
+    esac
+}
+
+# Function to organize files
+organize_files() {
+    local source_dir=${1:-$(pwd)}
+    local moved_count=0
+    local skipped_count=0
+    
+    print_info "Starting file organization in: $source_dir"
+    print_info "Script directory will be excluded from organization"
+    echo
+    
+    # Get the script's directory to avoid moving it
+    script_dir=$(dirname "$(readlink -f "$0")")
+    script_name=$(basename "$0")
+    
+    # Loop through all files in the current directory
+    for file in "$source_dir"/*; do
+        # Skip if it's a directory
+        if [ -d "$file" ]; then
+            continue
+        fi
+        
+        # Skip if it's not a regular file
+        if [ ! -f "$file" ]; then
+            continue
+        fi
+        
+        # Get filename
+        filename=$(basename "$file")
+        
+        # Skip the script itself
+        if [ "$filename" = "$script_name" ]; then
+            print_warning "Skipping script file: $filename"
+            ((skipped_count++))
+            continue
+        fi
+        
+        # Skip hidden files (starting with .)
+        if [[ "$filename" == .* ]]; then
+            print_warning "Skipping hidden file: $filename"
+            ((skipped_count++))
+            continue
+        fi
+        
+        # Get file extension (convert to lowercase)
+        extension="${filename##*.}"
+        extension=$(echo "$extension" | tr '[:upper:]' '[:lower:]')
+        
+        # Skip files without extension
+        if [ "$extension" = "$filename" ]; then
+            print_warning "Skipping file without extension: $filename"
+            ((skipped_count++))
+            continue
+        fi
+        
+        # Get category folder
+        category=$(get_category_folder "$extension")
+        
+        # Create category directory
+        create_directory "$source_dir/$category"
+        
+        # Create extension subdirectory within category
+        extension_dir="$source_dir/$category/$extension"
+        create_directory "$extension_dir"
+        
+        # Move file to appropriate directory
+        if mv "$file" "$extension_dir/"; then
+            print_success "Moved: $filename → $category/$extension/"
+            ((moved_count++))
+        else
+            print_error "Failed to move: $filename"
+        fi
+    done
+    
+    echo
+    print_info "Organization complete!"
+    print_info "Files moved: $moved_count"
+    print_info "Files skipped: $skipped_count"
+}
+
+# Function to show usage
+show_usage() {
+    echo "Usage: $0 [OPTIONS] [DIRECTORY]"
+    echo
+    echo "Options:"
+    echo "  -h, --help     Show this help message"
+    echo "  -d, --dry-run  Show what would be done without actually moving files"
+    echo
+    echo "Arguments:"
+    echo "  DIRECTORY      Directory to organize (default: current directory)"
+    echo
+    echo "Examples:"
+    echo "  $0                    # Organize current directory"
+    echo "  $0 /home/user/Downloads  # Organize Downloads folder"
+    echo "  $0 --dry-run            # Preview organization without moving files"
+}
+
+# Function for dry run
+dry_run() {
+    local source_dir=${1:-$(pwd)}
+    
+    print_info "DRY RUN: Showing what would be organized in: $source_dir"
+    echo
+    
+    script_name=$(basename "$0")
+    
+    for file in "$source_dir"/*; do
+        if [ -d "$file" ] || [ ! -f "$file" ]; then
+            continue
+        fi
+        
+        filename=$(basename "$file")
+        
+        # Skip the script itself and hidden files
+        if [ "$filename" = "$script_name" ] || [[ "$filename" == .* ]]; then
+            continue
+        fi
+        
+        extension="${filename##*.}"
+        extension=$(echo "$extension" | tr '[:upper:]' '[:lower:]')
+        
+        if [ "$extension" = "$filename" ]; then
+            continue
+        fi
+        
+        category=$(get_category_folder "$extension")
+        echo "Would move: $filename → $category/$extension/"
+    done
+    
+    echo
+    print_info "DRY RUN complete. Use without --dry-run to actually move files."
+}
+
+# Main script logic
+main() {
+    case "$1" in
+        -h|--help)
+            show_usage
+            exit 0
+            ;;
+        -d|--dry-run)
+            dry_run "$2"
+            exit 0
+            ;;
+        *)
+            # Check if directory argument is provided
+            if [ -n "$1" ] && [ -d "$1" ]; then
+                organize_files "$1"
+            elif [ -n "$1" ] && [ ! -d "$1" ]; then
+                print_error "Directory '$1' does not exist!"
+                exit 1
+            else
+                organize_files
+            fi
+            ;;
+    esac
+}
+
+# Run the main function with all arguments
+main "$@"
